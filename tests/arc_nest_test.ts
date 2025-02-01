@@ -114,3 +114,54 @@ Clarinet.test({
     assertEquals(event.timestamp, types.uint(1000));
   }
 });
+
+Clarinet.test({
+  name: "Test character relationship creation and validation",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const deployer = accounts.get('deployer')!;
+    
+    // Setup project and characters
+    let setupBlock = chain.mineBlock([
+      Tx.contractCall('arc-nest', 'create-project', [
+        types.ascii("My Novel")
+      ], deployer.address),
+      Tx.contractCall('arc-nest', 'add-character', [
+        types.uint(1),
+        types.ascii("Character 1"),
+        types.utf8("First character")
+      ], deployer.address),
+      Tx.contractCall('arc-nest', 'add-character', [
+        types.uint(1),
+        types.ascii("Character 2"),
+        types.utf8("Second character")
+      ], deployer.address)
+    ]);
+
+    // Add relationship between characters
+    let relationshipBlock = chain.mineBlock([
+      Tx.contractCall('arc-nest', 'add-character-relationship', [
+        types.uint(1),
+        types.uint(1),
+        types.uint(2),
+        types.ascii("Siblings"),
+        types.utf8("Brother and sister")
+      ], deployer.address)
+    ]);
+
+    relationshipBlock.receipts[0].result.expectOk();
+    assertEquals(relationshipBlock.receipts[0].result.expectOk(), types.uint(1));
+
+    // Verify relationship details
+    let getRelationshipBlock = chain.mineBlock([
+      Tx.contractCall('arc-nest', 'get-character-relationship', [
+        types.uint(1),
+        types.uint(1)
+      ], deployer.address)
+    ]);
+
+    const relationship = getRelationshipBlock.receipts[0].result.expectOk().expectSome();
+    assertEquals(relationship['character1-id'], types.uint(1));
+    assertEquals(relationship['character2-id'], types.uint(2));
+    assertEquals(relationship['relationship-type'], "Siblings");
+  }
+});
